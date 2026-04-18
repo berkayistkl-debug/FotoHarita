@@ -1,0 +1,82 @@
+{
+  "expo": {
+    "name": "FotoHarita",
+    "slug": "fotohrita",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "scheme": "fotohrita",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0A0A0F"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.fotohrita.app",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Yakınındaki fotoğraf noktalarını görmek için konumuna ihtiyacımız var.",
+        "NSLocationAlwaysUsageDescription": "Yakınında yeni çekim noktası eklendiğinde haber verebilmemiz için.",
+        "NSCameraUsageDescription": "Doğrudan uygulama içinden fotoğraf çekebilmek için.",
+        "NSPhotoLibraryUsageDescription": "Telefonundaki fotoğrafları yükleyebilmek için.",
+        "NSPhotoLibraryAddUsageDescription": "Fotoğraflarını galerine kaydedebilmek için."
+      }
+    },
+    "android": {
+      "package": "com.fotohrita.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0A0A0F"
+      },
+      "edgeToEdgeEnabled": true,
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Yakınındaki fotoğraf noktalarını görmek için konumuna ihtiyacımız var."
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Doğrudan uygulama içinden fotoğraf çekebilmek için."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Telefonundaki fotoğrafları yükleyebilmek için."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#FF5A5F"
+        }
+      ]
+    ],
+    "extra": {
+      "router": {
+        "origin": false
+      }
+    }
+  }
+}
