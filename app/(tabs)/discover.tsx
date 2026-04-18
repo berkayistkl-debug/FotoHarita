@@ -4,15 +4,17 @@ import {
   FlatList,
   StyleSheet,
   Dimensions,
-  ScrollView,
   Text,
   TouchableOpacity,
   Share,
   Linking,
   RefreshControl,
   ViewToken,
+  Modal,
+  ScrollView,
 } from 'react-native';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
+import { Feather } from '@expo/vector-icons';
 import {
   supabase,
   getDiscoverFeed,
@@ -95,6 +97,7 @@ export default function DiscoverScreen() {
   const [pins, setPins] = useState<Pin[]>([]);
   const [page, setPage] = useState(0);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [showFilterModal, setShowFilterModal] = useState(false);
   const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
   const [profileId, setProfileId] = useState<string | null>(null);
@@ -339,50 +342,56 @@ export default function DiscoverScreen() {
         </View>
       )}
 
-      {/* Kategori şeridi — Keşfet modunda */}
+      {/* Filtrele butonu — Keşfet modunda */}
       {!isOriginMode && discoverTab === 'kesfet' && (
-        <View style={styles.filterBar}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.filterContent}
-          >
+        <TouchableOpacity
+          style={[styles.filterBtn, { backgroundColor: selectedCategory ? colors.primary + '20' : colors.surface, borderColor: selectedCategory ? colors.primary : colors.border }]}
+          onPress={() => setShowFilterModal(true)}
+          activeOpacity={0.8}
+        >
+          <Feather name="sliders" size={13} color={selectedCategory ? colors.primary : colors.textMuted} />
+          <Text style={[styles.filterBtnText, { color: selectedCategory ? colors.primary : colors.textMuted }]}>
+            {selectedCategory ? CATEGORIES.find(c => c.key === selectedCategory)?.label ?? 'Filtrele' : 'Filtrele'}
+          </Text>
+          {selectedCategory && (
+            <TouchableOpacity onPress={() => setSelectedCategory(null)} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+              <Feather name="x" size={12} color={colors.primary} />
+            </TouchableOpacity>
+          )}
+        </TouchableOpacity>
+      )}
+
+      {/* Kategori filtre modal */}
+      <Modal visible={showFilterModal} transparent animationType="slide" onRequestClose={() => setShowFilterModal(false)}>
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowFilterModal(false)} />
+        <View style={[styles.filterSheet, { backgroundColor: colors.surface }]}>
+          <View style={[styles.filterHandle, { backgroundColor: colors.border }]} />
+          <Text style={[styles.filterSheetTitle, { color: colors.text }]}>Kategori Seç</Text>
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.filterSheetContent}>
             <TouchableOpacity
-              onPress={() => setSelectedCategory(null)}
-              style={[styles.chip, !selectedCategory && styles.chipActive]}
-              activeOpacity={0.8}
+              style={[styles.filterRow, !selectedCategory && { backgroundColor: colors.primary + '15' }]}
+              onPress={() => { setSelectedCategory(null); setShowFilterModal(false); }}
+              activeOpacity={0.7}
             >
-              <Text style={[styles.chipText, !selectedCategory && styles.chipTextActive]}>
-                ✨ Tümü
-              </Text>
+              <Text style={styles.filterRowEmoji}>✨</Text>
+              <Text style={[styles.filterRowLabel, { color: !selectedCategory ? colors.primary : colors.text }]}>Tümü</Text>
+              {!selectedCategory && <Feather name="check" size={16} color={colors.primary} />}
             </TouchableOpacity>
             {CATEGORIES.map((cat) => (
               <TouchableOpacity
                 key={cat.key}
-                onPress={() => setSelectedCategory(cat.key)}
-                activeOpacity={0.8}
-                style={[
-                  styles.chip,
-                  selectedCategory === cat.key && {
-                    backgroundColor: cat.color + '25',
-                    borderColor: cat.color + '80',
-                  },
-                ]}
+                style={[styles.filterRow, selectedCategory === cat.key && { backgroundColor: cat.color + '15' }]}
+                onPress={() => { setSelectedCategory(cat.key); setShowFilterModal(false); }}
+                activeOpacity={0.7}
               >
-                <Text style={styles.chipEmoji}>{cat.emoji}</Text>
-                <Text
-                  style={[
-                    styles.chipText,
-                    selectedCategory === cat.key && { color: cat.color },
-                  ]}
-                >
-                  {cat.label}
-                </Text>
+                <Text style={styles.filterRowEmoji}>{cat.emoji}</Text>
+                <Text style={[styles.filterRowLabel, { color: selectedCategory === cat.key ? cat.color : colors.text }]}>{cat.label}</Text>
+                {selectedCategory === cat.key && <Feather name="check" size={16} color={cat.color} />}
               </TouchableOpacity>
             ))}
           </ScrollView>
         </View>
-      )}
+      </Modal>
 
       {/* Feed */}
       {(discoverTab === 'kesfet' || isOriginMode) && (
@@ -477,20 +486,58 @@ const styles = StyleSheet.create({
     letterSpacing: -0.3,
   },
 
-  // Kategori şeridi — tab switcher'ın altında
-  filterBar: {
+  // Filtrele butonu
+  filterBtn: {
     position: 'absolute',
     top: 148,
-    left: 0,
-    right: 0,
+    left: Spacing.md,
     zIndex: 10,
-  },
-  filterContent: {
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.xs,
-    gap: Spacing.xs,
     flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: BorderRadius.full,
+    borderWidth: 1,
   },
+  filterBtnText: { fontSize: 12, fontWeight: '600' },
+
+  // Filtre modal
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' },
+  filterSheet: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingBottom: 40,
+    maxHeight: '70%',
+  },
+  filterHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginTop: 10,
+    marginBottom: 8,
+  },
+  filterSheetTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.sm,
+    letterSpacing: -0.3,
+  },
+  filterSheetContent: { paddingHorizontal: Spacing.md, paddingBottom: 16 },
+  filterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 13,
+    paddingHorizontal: Spacing.md,
+    borderRadius: BorderRadius.md,
+    marginBottom: 2,
+  },
+  filterRowEmoji: { fontSize: 20, width: 28, textAlign: 'center' },
+  filterRowLabel: { flex: 1, fontSize: 15, fontWeight: '500' },
+
   chip: {
     flexDirection: 'row',
     alignItems: 'center',

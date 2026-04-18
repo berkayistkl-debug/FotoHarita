@@ -13,14 +13,12 @@ import {
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
-import { supabase, getUserPins, getUserBadges, getSavedPins } from '@lib/supabase';
+import { supabase, getUserPins, getSavedPins } from '@lib/supabase';
 import { useCoins } from '@hooks/useCoins';
 import { spendCoins, COIN_COSTS } from '@lib/coins';
 import { useTheme } from '../../context/ThemeContext';
 import { DarkColors, Spacing, BorderRadius } from '@constants/theme';
-import { BadgeShelf } from '@components/ui/BadgeShelf';
 import { User, Pin } from '@/types/database';
-import { BADGES } from '../../constants/badges';
 
 type C = typeof DarkColors;
 type Tab = 'posts' | 'saved';
@@ -35,7 +33,6 @@ export default function ProfileScreen() {
   const [profile, setProfile] = useState<User | null>(null);
   const [pins, setPins] = useState<Pin[]>([]);
   const [savedPins, setSavedPins] = useState<Pin[]>([]);
-  const [badges, setBadges] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<Tab>('posts');
   const [refreshing, setRefreshing] = useState(false);
   const { balance } = useCoins(profile?.id ?? null);
@@ -52,13 +49,11 @@ export default function ProfileScreen() {
 
     if (prof) {
       setProfile(prof);
-      const [userPins, userBadges, saved] = await Promise.all([
+      const [userPins, saved] = await Promise.all([
         getUserPins(prof.id),
-        getUserBadges(prof.id),
         getSavedPins(prof.id),
       ]);
       setPins(userPins ?? []);
-      setBadges((userBadges ?? []).map((b: any) => b.badge_key));
       setSavedPins(saved ?? []);
     }
   };
@@ -107,7 +102,7 @@ export default function ProfileScreen() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
-        stickyHeaderIndices={[2]}
+        stickyHeaderIndices={[1]}
       >
         {/* ── Profil bilgi bloğu ── */}
         <View style={s.profileBlock}>
@@ -153,41 +148,6 @@ export default function ProfileScreen() {
             </TouchableOpacity>
           </View>
         </View>
-
-        {/* ── Rozetler — Instagram Highlights stili ── */}
-        {badges.length > 0 && (
-          <View style={s.highlights}>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.highlightsContent}>
-              {badges.map((key) => {
-                const badge = BADGES.find((b) => b.key === key);
-                if (!badge) return null;
-                return (
-                  <TouchableOpacity
-                    key={key}
-                    style={s.highlight}
-                    activeOpacity={0.75}
-                    onPress={() =>
-                      Alert.alert(
-                        `${badge.emoji} ${badge.label}`,
-                        badge.description,
-                        [{ text: 'Tamam' }]
-                      )
-                    }
-                  >
-                    <View style={[s.highlightRing, { borderColor: colors.primary }]}>
-                      <View style={[s.highlightCircle, { backgroundColor: colors.surface }]}>
-                        <Text style={s.highlightEmoji}>{badge.emoji}</Text>
-                      </View>
-                    </View>
-                    <Text style={[s.highlightLabel, { color: colors.text }]} numberOfLines={1}>
-                      {badge.label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </View>
-        )}
 
         {/* ── Tab bar ── */}
         <View style={[s.tabBar, { backgroundColor: colors.background, borderTopColor: colors.border, borderBottomColor: colors.border }]}>

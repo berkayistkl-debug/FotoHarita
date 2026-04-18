@@ -14,18 +14,12 @@ import { Feather } from '@expo/vector-icons';
 import { supabase } from '@lib/supabase';
 import { BorderRadius, Spacing, DarkColors } from '@constants/theme';
 
+const PLACES_KEY = process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY ?? '';
+
 interface UserResult {
   id: string;
   username: string;
   avatar_url: string | null;
-}
-
-interface PlaceResult {
-  id: string;
-  name: string;
-  category: string;
-  lat: number;
-  lng: number;
 }
 
 interface SearchResult {
@@ -61,36 +55,40 @@ export function SearchOverlay({ colors, placeholder = 'Kullanıcı veya mekan ar
     setLoading(true);
     try {
       const pattern = `%${text.trim()}%`;
-      const [{ data: users }, { data: places }] = await Promise.all([
-        supabase
-          .from('users')
-          .select('id, username, avatar_url')
-          .ilike('username', pattern)
-          .limit(4),
-        supabase
-          .from('locations')
-          .select('id, name, category, lat, lng')
-          .ilike('name', pattern)
-          .limit(4),
-      ]);
 
-      const combined: SearchResult[] = [
-        ...((users ?? []) as UserResult[]).map((u) => ({
-          type: 'user' as const,
-          id: u.id,
-          title: `@${u.username}`,
-          avatar_url: u.avatar_url,
-        })),
-        ...((places ?? []) as PlaceResult[]).map((p) => ({
-          type: 'place' as const,
-          id: p.id,
-          title: p.name,
-          subtitle: p.category,
-          lat: p.lat,
-          lng: p.lng,
-        })),
-      ];
-      setResults(combined);
+      // Kullanıcı araması (yerel DB)
+      const { data: users } = await supabase
+        .from('users')
+        .select('id, username, avatar_url')
+        .ilike('username', pattern)
+        .limit(3);
+
+      // Yer araması (Google Places)
+      let placeResults: SearchResult[] = [];
+      if (PLACES_KEY) {
+        try {
+          const url = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(text.trim())}&key=${PLACES_KEY}&language=tr&components=country:tr`;
+          const res = await fetch(url);
+          const json = await res.json();
+          placeResults = (json.predictions ?? []).slice(0, 4).map((p: any) => ({
+            type: 'place' as const,
+            id: p.place_id,
+            title: p.structured_formatting?.main_text ?? p.description,
+            subtitle: p.structured_formatting?.secondary_text ?? '',
+          }));
+        } catch {
+          // Google Places başarısız olursa devam et
+        }
+      }
+
+      const userResults: SearchResult[] = ((users ?? []) as UserResult[]).map((u) => ({
+        type: 'user' as const,
+        id: u.id,
+        title: `@${u.username}`,
+        avatar_url: u.avatar_url,
+      }));
+
+      setResults([...userResults, ...placeResults]);
     } finally {
       setLoading(false);
     }
@@ -102,12 +100,26 @@ export function SearchOverlay({ colors, placeholder = 'Kullanıcı veya mekan ar
     debounceRef.current = setTimeout(() => search(text), 280);
   };
 
-  const handleSelect = (item: SearchResult) => {
+  const handleSelect = async (item: SearchResult) => {
     if (item.type === 'user') {
       onSelectUser(item.id, item.title);
     } else {
-      if (item.lat == null || item.lng == null) return;
-      onSelectPlace(item.id, item.title, item.lat, item.lng);
+      // Google place_id → koordinat al
+      if (item.lat != null && item.lng != null) {
+        onSelectPlace(item.id, item.title, item.lat, item.lng);
+      } else if (PLACES_KEY) {
+        try {
+          const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${item.id}&fields=geometry,name&key=${PLACES_KEY}`;
+          const res = await fetch(url);
+          const json = await res.json();
+          const loc = json.result?.geometry?.location;
+          if (loc) {
+            onSelectPlace(item.id, item.title, loc.lat, loc.lng);
+          }
+        } catch {
+          return;
+        }
+      }
     }
     setQuery('');
     setResults([]);
@@ -127,7 +139,7 @@ export function SearchOverlay({ colors, placeholder = 'Kullanıcı veya mekan ar
           value={query}
           onChangeText={handleChange}
           onFocus={() => setFocused(true)}
-          onBlur={() => setTimeout(() => setFocused(false), 150)}
+          onBlur={() => setTimeout(() => setFocused(false), 200)}
           returnKeyType="search"
           autoCorrect={false}
           autoCapitalize="none"
@@ -170,11 +182,11 @@ export function SearchOverlay({ colors, placeholder = 'Kullanıcı veya mekan ar
                   <Text style={[styles.rowTitle, { color: colors.text }]} numberOfLines={1}>
                     {item.title}
                   </Text>
-                  {item.subtitle && (
+                  {item.subtitle ? (
                     <Text style={[styles.rowSub, { color: colors.textMuted }]} numberOfLines={1}>
                       {item.subtitle}
                     </Text>
-                  )}
+                  ) : null}
                 </View>
                 <Feather name="chevron-right" size={14} color={colors.textMuted} />
               </TouchableOpacity>
