@@ -8,10 +8,11 @@ import {
   StyleSheet,
   ActivityIndicator,
   Image,
+  ViewStyle,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { supabase } from '@lib/supabase';
-import { BorderRadius, Spacing } from '@constants/theme';
+import { BorderRadius, Spacing, DarkColors } from '@constants/theme';
 
 interface UserResult {
   id: string;
@@ -38,11 +39,11 @@ interface SearchResult {
 }
 
 interface Props {
-  colors: any;
+  colors: typeof DarkColors;
   placeholder?: string;
   onSelectUser: (userId: string, username: string) => void;
   onSelectPlace: (placeId: string, name: string, lat: number, lng: number) => void;
-  style?: any;
+  style?: ViewStyle;
 }
 
 export function SearchOverlay({ colors, placeholder = 'Kullanıcı veya mekan ara...', onSelectUser, onSelectPlace, style }: Props) {
@@ -105,7 +106,8 @@ export function SearchOverlay({ colors, placeholder = 'Kullanıcı veya mekan ar
     if (item.type === 'user') {
       onSelectUser(item.id, item.title);
     } else {
-      onSelectPlace(item.id, item.title, item.lat!, item.lng!);
+      if (item.lat == null || item.lng == null) return;
+      onSelectPlace(item.id, item.title, item.lat, item.lng);
     }
     setQuery('');
     setResults([]);

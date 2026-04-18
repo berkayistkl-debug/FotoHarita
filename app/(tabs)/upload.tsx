@@ -34,6 +34,7 @@ type VerifyStatus = 'idle' | 'verifying' | 'verified' | 'failed';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const MAX_PHOTOS = 10;
+const PLACES_KEY = process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY ?? '';
 
 export default function UploadScreen() {
   const router = useRouter();
@@ -59,7 +60,6 @@ export default function UploadScreen() {
   const [uploading, setUploading] = useState(false);
   const [processing, setProcessing] = useState(false);
 
-  const PLACES_KEY = process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY ?? '';
 
   const searchPlaces = (query: string) => {
     setSearchQuery(query);
@@ -176,10 +176,11 @@ export default function UploadScreen() {
     if (!result.canceled && result.assets.length > 0) {
       setProcessing(true);
       try {
+        const wasEmpty = imageUris.length === 0;
         const processed = await Promise.all(result.assets.map(a => processImage(a.uri, aspectRatio)));
         const merged = [...imageUris, ...processed].slice(0, MAX_PHOTOS);
         setImageUris(merged);
-        if (imageUris.length === 0) await verifyPhoto('gallery');
+        if (wasEmpty) await verifyPhoto('gallery');
       } finally {
         setProcessing(false);
       }
@@ -199,12 +200,10 @@ export default function UploadScreen() {
     if (!result.canceled && result.assets[0]) {
       setProcessing(true);
       try {
+        const wasEmpty = imageUris.length === 0;
         const processed = await processImage(result.assets[0].uri, aspectRatio);
-        setImageUris(prev => {
-          const next = [...prev, processed].slice(0, MAX_PHOTOS);
-          return next;
-        });
-        if (imageUris.length === 0) await verifyPhoto('camera');
+        setImageUris(prev => [...prev, processed].slice(0, MAX_PHOTOS));
+        if (wasEmpty) await verifyPhoto('camera');
       } finally {
         setProcessing(false);
       }
@@ -230,19 +229,31 @@ export default function UploadScreen() {
         .from('users').select('id').eq('auth_id', user.id).single();
       if (!profile) throw new Error('Profil bulunamadı.');
 
-      // Tüm fotoğrafları sırayla yükle
-      const uploadedUrls: string[] = [];
+      // Tüm fotoğrafları paralel yükle
       const batchTs = Date.now();
-      for (let i = 0; i < imageUris.length; i++) {
-        const fileName = `${profile.id}/${batchTs}_${i}.jpg`;
-        const fetchRes = await fetch(imageUris[i]);
-        const arrayBuffer = await fetchRes.arrayBuffer();
-        const { error: uploadError } = await supabase.storage
-          .from('pins').upload(fileName, arrayBuffer, { contentType: 'image/jpeg' });
-        if (uploadError) throw new Error(`Fotoğraf ${i + 1}/${imageUris.length} yükleme hatası: ${uploadError.message}`);
-        const { data: { publicUrl } } = supabase.storage.from('pins').getPublicUrl(fileName);
-        uploadedUrls.push(publicUrl);
+      const fileNames = imageUris.map((_, i) => `${profile.id}/${batchTs}_${i}.jpg`);
+
+      const uploadResults = await Promise.allSettled(
+        imageUris.map(async (uri, i) => {
+          const fetchRes = await fetch(uri);
+          const arrayBuffer = await fetchRes.arrayBuffer();
+          const { error: uploadError } = await supabase.storage
+            .from('pins').upload(fileNames[i], arrayBuffer, { contentType: 'image/jpeg' });
+          if (uploadError) throw new Error(`Fotoğraf ${i + 1}: ${uploadError.message}`);
+          return supabase.storage.from('pins').getPublicUrl(fileNames[i]).data.publicUrl;
+        })
+      );
+
+      const failed = uploadResults.filter(r => r.status === 'rejected');
+      if (failed.length > 0) {
+        // Yüklenen dosyaları temizle
+        await supabase.storage.from('pins').remove(
+          uploadResults.map((r, i) => r.status === 'fulfilled' ? fileNames[i] : null).filter(Boolean) as string[]
+        );
+        throw new Error(`${failed.length} fotoğraf yüklenemedi. Lütfen tekrar deneyin.`);
       }
+
+      const uploadedUrls = uploadResults.map(r => (r as PromiseFulfilledResult<string>).value);
 
       const { data: locationId, error: locError } = await supabase.rpc('find_or_create_location', {
         p_lat: pinLocation.lat,
@@ -266,12 +277,12 @@ export default function UploadScreen() {
           gps_verified: verifyResult?.verified ?? false,
           upload_lat: pinLocation.lat,
           upload_lng: pinLocation.lng,
-          moderation_status: 'approved',
+          moderation_status: 'pending',
         })
         .select().single();
       if (pinError) throw new Error(`Pin kayıt hatası: ${pinError.message}`);
 
-      // Asenkron moderasyon (ilk fotoğraf üzerinden)
+      // Asenkron moderasyon — onaylanınca 'approved', reddedilince 'rejected'
       moderateImage(uploadedUrls[0]).then((status) => {
         supabase.from('pins').update({ moderation_status: status }).eq('id', pin.id);
       });

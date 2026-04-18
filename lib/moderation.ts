@@ -8,8 +8,8 @@ type ModerationResult = 'approved' | 'rejected' | 'review';
  */
 export async function moderateImage(imageUrl: string): Promise<ModerationResult> {
   if (!VISION_KEY) {
-    console.warn('Vision API key bulunamadı, otomatik onaylıyor');
-    return 'approved';
+    console.warn('Vision API key bulunamadı, manuel incelemeye alınıyor');
+    return 'review';
   }
 
   try {

@@ -1,8 +1,11 @@
 import { createClient } from '@supabase/supabase-js';
 import * as SecureStore from 'expo-secure-store';
 
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error('EXPO_PUBLIC_SUPABASE_URL ve EXPO_PUBLIC_SUPABASE_ANON_KEY tanımlanmalı.');
+}
 
 const StorageAdapter = {
   getItem: (key: string) => SecureStore.getItemAsync(key),
@@ -115,7 +118,7 @@ export async function getDiscoverFeed(
     .order('like_count', { ascending: false })
     .range(page * pageSize, (page + 1) * pageSize - 1);
 
-  if (category) query = query.eq('location.category', category);
+  if (category) query = query.eq('locations.category', category);
 
   const { data, error } = await query;
   if (error) throw error;

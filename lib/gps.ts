@@ -75,20 +75,9 @@ export async function verifyLocation(
   };
 }
 
-/**
- * @deprecated verifyLocation kullan
- */
-export async function verifyLocationLegacy(
-  photoExifLat: number | null,
-  photoExifLng: number | null,
-  toleranceMeters = 1000
-): Promise<LocationVerifyResult> {
-  return verifyLocation(
-    photoExifLat ?? 0,
-    photoExifLng ?? 0,
-    'gallery',
-    toleranceMeters
-  );
+/** @deprecated Kaldırıldı — verifyLocation kullan */
+export function verifyLocationLegacy(): never {
+  throw new Error('verifyLocationLegacy kaldırıldı — verifyLocation kullan');
 }
 
 /**

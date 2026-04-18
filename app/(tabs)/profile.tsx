@@ -40,9 +40,7 @@ export default function ProfileScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const { balance } = useCoins(profile?.id ?? null);
 
-  useEffect(() => { loadProfile(); }, []);
-
-  // Her sekmeye gelişte yenile
+  // Her sekmeye gelişte yenile (mount dahil)
   useFocusEffect(useCallback(() => { loadProfile(); }, []));
 
   const loadProfile = async () => {

@@ -25,7 +25,7 @@ type CoinReason =
   | 'special_pin';
 
 /**
- * Kullanıcıya coin ekle
+ * Kullanıcıya coin ekle — SECURITY DEFINER RPC üzerinden
  */
 export async function awardCoins(
   userId: string,
@@ -33,17 +33,17 @@ export async function awardCoins(
   reason: CoinReason,
   pinId?: string
 ): Promise<void> {
-  const { error } = await supabase.from('coin_transactions').insert({
-    user_id: userId,
-    amount,
-    reason,
-    pin_id: pinId ?? null,
+  const { error } = await supabase.rpc('award_coins', {
+    p_user_id: userId,
+    p_amount: amount,
+    p_reason: reason,
+    p_pin_id: pinId ?? null,
   });
   if (error) throw error;
 }
 
 /**
- * Kullanıcıdan coin harca
+ * Kullanıcıdan coin harca — atomik RPC ile race condition önlenir
  */
 export async function spendCoins(
   userId: string,
@@ -51,25 +51,18 @@ export async function spendCoins(
   reason: CoinReason,
   pinId?: string
 ): Promise<void> {
-  // Önce bakiyeyi kontrol et
-  const { data: user, error: userError } = await supabase
-    .from('users')
-    .select('coin_balance')
-    .eq('id', userId)
-    .single();
-
-  if (userError) throw userError;
-  if (!user || user.coin_balance < cost) {
-    throw new Error(`Yetersiz coin. Gerekli: ${cost}, Mevcut: ${user?.coin_balance ?? 0}`);
-  }
-
-  const { error } = await supabase.from('coin_transactions').insert({
-    user_id: userId,
-    amount: -cost,
-    reason,
-    pin_id: pinId ?? null,
+  const { error } = await supabase.rpc('spend_coins', {
+    p_user_id: userId,
+    p_amount: cost,
+    p_reason: reason,
+    p_pin_id: pinId ?? null,
   });
-  if (error) throw error;
+  if (error) {
+    if (error.message?.includes('insufficient_coins')) {
+      throw new Error(`Yetersiz coin. Gerekli: ${cost}`);
+    }
+    throw error;
+  }
 }
 
 /**
@@ -85,12 +78,13 @@ export async function processUploadCoins(
     return { coinsEarned: 0, reason: 'GPS doğrulaması olmadan coin kazanılamaz.' };
   }
 
-  // Aynı yere daha önce yükleme yaptı mı?
+  // Aynı yere daha önce yükleme yaptı mı? (yeni eklenen pin hariç)
   const { data: existingPins } = await supabase
     .from('pins')
     .select('id, created_at')
     .eq('user_id', userId)
     .eq('location_id', locationId)
+    .neq('id', pinId)
     .order('created_at', { ascending: false })
     .limit(5);
 

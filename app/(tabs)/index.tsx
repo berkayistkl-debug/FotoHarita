@@ -34,6 +34,7 @@ export default function MapScreen() {
 
   const clusterIndex = useRef<Supercluster | null>(null);
   const hasAnimatedToUser = useRef(false);
+  const regionDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Kullanıcı konumu ilk kez gelince haritayı oraya taşı
   useEffect(() => {
@@ -62,32 +63,33 @@ export default function MapScreen() {
   }, [pins]);
 
   const handleRegionChange = useCallback(
-    async (region: Region) => {
-      const latDelta = region.latitudeDelta;
-      const zoomEst = Math.round(Math.log(360 / latDelta) / Math.LN2);
-      setZoom(zoomEst);
+    (region: Region) => {
+      if (regionDebounce.current) clearTimeout(regionDebounce.current);
+      regionDebounce.current = setTimeout(async () => {
+        const latDelta = region.latitudeDelta;
+        const zoomEst = Math.round(Math.log(360 / latDelta) / Math.LN2);
+        setZoom(zoomEst);
 
-      await loadPins(
-        {
-          minLat: region.latitude - region.latitudeDelta / 2,
-          minLng: region.longitude - region.longitudeDelta / 2,
-          maxLat: region.latitude + region.latitudeDelta / 2,
-          maxLng: region.longitude + region.longitudeDelta / 2,
-        },
-        zoomEst
-      );
+        await loadPins(
+          {
+            minLat: region.latitude - region.latitudeDelta / 2,
+            minLng: region.longitude - region.longitudeDelta / 2,
+            maxLat: region.latitude + region.latitudeDelta / 2,
+            maxLng: region.longitude + region.longitudeDelta / 2,
+          },
+          zoomEst
+        );
 
-      // Cluster hesapla
-      if (clusterIndex.current) {
-        const bbox: [number, number, number, number] = [
-          region.longitude - region.longitudeDelta / 2,
-          region.latitude - region.latitudeDelta / 2,
-          region.longitude + region.longitudeDelta / 2,
-          region.latitude + region.latitudeDelta / 2,
-        ];
-        const cl = clusterIndex.current.getClusters(bbox, zoomEst);
-        setClusters(cl);
-      }
+        if (clusterIndex.current) {
+          const bbox: [number, number, number, number] = [
+            region.longitude - region.longitudeDelta / 2,
+            region.latitude - region.latitudeDelta / 2,
+            region.longitude + region.longitudeDelta / 2,
+            region.latitude + region.latitudeDelta / 2,
+          ];
+          setClusters(clusterIndex.current.getClusters(bbox, zoomEst));
+        }
+      }, 350);
     },
     [loadPins]
   );

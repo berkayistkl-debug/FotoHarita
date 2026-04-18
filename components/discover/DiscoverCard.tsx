@@ -102,7 +102,7 @@ export function DiscoverCard({
         />
         <ActionButton
           icon="message-circle"
-          label={(pin as any).comment_count?.toString() ?? '0'}
+          label={pin.comment_count?.toString() ?? '0'}
           onPress={onPress}
         />
         <ActionButton

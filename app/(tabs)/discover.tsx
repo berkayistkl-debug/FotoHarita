@@ -52,6 +52,7 @@ function nearbyToPin(n: NearbyPin): Pin {
     aspect_ratio: (n.aspect_ratio as '4:3' | '16:9') ?? '4:3',
     like_count: n.like_count,
     comment_count: n.comment_count,
+    view_count: n.view_count ?? 0,
     created_at: n.created_at,
     user: {
       id: n.user_id,
@@ -103,6 +104,7 @@ export default function DiscoverScreen() {
   const sortedNearby = useRef<Pin[]>([]);
   const prevOriginId = useRef<string | null>(null);
   const seenIds = useRef<Set<string>>(new Set());
+  const loadingRef = useRef(false);
 
   // Profil ID'sini al (auth_id değil, users.id)
   useEffect(() => {
@@ -116,7 +118,8 @@ export default function DiscoverScreen() {
 
   // --- Origin modu ---
   const loadOriginFeed = useCallback(async (pinId: string, oLat: number, oLng: number) => {
-    if (loading) return;
+    if (loadingRef.current) return;
+    loadingRef.current = true;
     setLoading(true);
     try {
       const [originPin, nearby] = await Promise.all([
@@ -134,13 +137,15 @@ export default function DiscoverScreen() {
     } catch (e) {
       console.warn('Origin feed hatası:', e);
     } finally {
+      loadingRef.current = false;
       setLoading(false);
     }
   }, []);
 
   // --- Normal mod ---
   const loadNormalFeed = useCallback(async (reset = false) => {
-    if (loading) return;
+    if (loadingRef.current) return;
+    loadingRef.current = true;
     setLoading(true);
     const currentPage = reset ? 0 : page;
     try {
@@ -159,9 +164,10 @@ export default function DiscoverScreen() {
         setPage(currentPage + 1);
       }
     } finally {
+      loadingRef.current = false;
       setLoading(false);
     }
-  }, [lat, lng, selectedCategory, page, loading]);
+  }, [lat, lng, selectedCategory, page]);
 
   // Pull-to-refresh
   const handleRefresh = async () => {
@@ -203,11 +209,11 @@ export default function DiscoverScreen() {
   // Her ekrana gelindiğinde yenile
   useFocusEffect(
     useCallback(() => {
-      if (!isOriginMode && !loading) {
+      if (!isOriginMode) {
         seenIds.current.clear();
         loadNormalFeed(true);
       }
-    }, [isOriginMode, discoverTab, selectedCategory])
+    }, [isOriginMode, discoverTab, selectedCategory, loadNormalFeed])
   );
 
   // Infinite scroll

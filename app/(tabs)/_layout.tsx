@@ -48,7 +48,10 @@ export default function TabsLayout() {
 
   // Profil id'sini al ve okunmamış bildirim sayısını yükle
   useEffect(() => {
-    supabase.auth.getUser().then(async ({ data }) => {
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+
+    (async () => {
+      const { data } = await supabase.auth.getUser();
       if (!data.user) return;
       const { data: prof } = await supabase
         .from('users').select('id').eq('auth_id', data.user.id).single();
@@ -62,8 +65,7 @@ export default function TabsLayout() {
         .eq('read', false);
       setUnreadCount(count ?? 0);
 
-      // Realtime yeni bildirim gelince sayacı artır
-      const channel = supabase
+      channel = supabase
         .channel(`badge_${prof.id}`)
         .on('postgres_changes', {
           event: 'INSERT', schema: 'public', table: 'notifications',
@@ -72,9 +74,11 @@ export default function TabsLayout() {
           setUnreadCount((n) => n + 1);
         })
         .subscribe();
+    })();
 
-      return () => { supabase.removeChannel(channel); };
-    });
+    return () => {
+      if (channel) supabase.removeChannel(channel);
+    };
   }, []);
 
   // Notifications sekmesine girilince rozeti sıfırla

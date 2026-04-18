@@ -22,7 +22,12 @@ export function useLocation() {
     let subscriber: Location.LocationSubscription | null = null;
 
     (async () => {
-      const { status } = await Location.getForegroundPermissionsAsync();
+      let { status } = await Location.getForegroundPermissionsAsync();
+
+      if (status === 'undetermined') {
+        const { status: requested } = await Location.requestForegroundPermissionsAsync();
+        status = requested;
+      }
 
       if (status !== 'granted') {
         setState((s) => ({ ...s, permissionGranted: false, loading: false }));
