@@ -334,11 +334,12 @@ function makeStyles(c: C) {
     // Tab bar
     tabBar: {
       flexDirection: 'row',
+      width: '100%',
       borderTopWidth: 0.5,
       borderBottomWidth: 0.5,
     },
     tab: {
-      flex: 1,
+      width: '50%',
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
